@@ -1,0 +1,30 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Données (on ne versionne pas les datasets / bases)
+data/
+*.csv
+*.parquet
+*.duckdb
+*.joblib
+
+# Vector store
+chroma/
+*.faiss
+
+# dbt
+target/
+dbt_packages/
+logs/
+
+# Jupyter / IDE
+.ipynb_checkpoints/
+.vscode/
+.idea/

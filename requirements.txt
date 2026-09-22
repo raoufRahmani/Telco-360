@@ -1,0 +1,29 @@
+# Data
+pandas
+duckdb
+
+# Ingestion
+google-play-scraper
+praw
+tenacity          # retries/backoff
+
+# ML
+scikit-learn
+xgboost
+shap
+
+# NLP / LLM / RAG
+openai            # ou le client de ton fournisseur LLM
+sentence-transformers
+chromadb
+
+# App
+streamlit
+
+# Qualité / tests
+pytest
+ruff
+
+# Config
+python-dotenv
+pydantic
