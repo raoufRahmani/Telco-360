@@ -27,3 +27,4 @@ ruff
 # Config
 python-dotenv
 pydantic
+dbt-duckdb

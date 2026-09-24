@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: mart_motifs_operateur
+    description: >
+      Répartition des motifs par opérateur. C'est le pont avec la couche churn :
+      les 4 motifs (reseau, facturation, resiliation, service_client) + autre.
+    columns:
+      - name: operateur
+        tests: [not_null]
+      - name: motif
+        tests: [not_null]
+      - name: n_avis
+        tests: [not_null]

@@ -1,0 +1,11 @@
+version: 2
+
+# Tables brutes écrites par les scripts Python (ingestion/run.py, enrichment/run.py)
+sources:
+  - name: raw
+    schema: main
+    tables:
+      - name: raw_avis
+        description: Avis bruts Google Play + App Store (1 ligne par avis)
+      - name: enriched_avis
+        description: Motif + sentiment de chaque avis, donnés par le LLM

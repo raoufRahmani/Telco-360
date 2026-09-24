@@ -1,0 +1,35 @@
+version: 2
+
+models:
+  - name: stg_avis
+    description: Avis nettoyés + motif et sentiment (1 ligne par avis enrichi)
+    columns:
+      - name: avis_key
+        tests: [unique, not_null]
+      - name: source
+        tests:
+          - accepted_values:
+              arguments:
+                values: [google_play, app_store]
+      - name: operateur
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [orange, sfr, bouygues, free]
+      - name: note
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+                quote: false
+      - name: motif
+        tests:
+          - accepted_values:
+              arguments:
+                values: [reseau, facturation, resiliation, service_client, autre]
+      - name: sentiment
+        tests:
+          - accepted_values:
+              arguments:
+                values: [positif, neutre, negatif]

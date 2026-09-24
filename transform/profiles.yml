@@ -1,0 +1,8 @@
+# Connexion dbt -> la base DuckDB du projet (chemin relatif au dossier transform/)
+telco360:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ../data/telco360.duckdb
+      threads: 1

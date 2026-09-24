@@ -1,0 +1,12 @@
+name: telco360
+version: "1.0.0"
+profile: telco360
+
+model-paths: ["models"]
+
+models:
+  telco360:
+    staging:
+      +materialized: view    # vue : toujours à jour, ne prend pas de place
+    marts:
+      +materialized: table   # table : prête à être lue par l'app / le notebook
