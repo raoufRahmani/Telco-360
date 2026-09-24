@@ -9,3 +9,11 @@ sources:
         description: Avis bruts Google Play + App Store (1 ligne par avis)
       - name: enriched_avis
         description: Motif + sentiment de chaque avis, donnés par le LLM
+
+  # Dataset Kaggle Telco Customer Churn, lu directement depuis le CSV dans data/
+  - name: kaggle
+    tables:
+      - name: telco_churn
+        description: 1 ligne par client (≈ 7 000), colonne Churn = Yes/No
+        meta:
+          external_location: "read_csv('../data/WA_Fn-UseC_-Telco-Customer-Churn.csv', header = true, all_varchar = true)"

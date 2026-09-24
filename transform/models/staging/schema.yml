@@ -33,3 +33,35 @@ models:
           - accepted_values:
               arguments:
                 values: [positif, neutre, negatif]
+
+  - name: stg_churn
+    description: Clients Kaggle nettoyés (types, noms en français, churn en 0/1)
+    columns:
+      - name: customer_id
+        tests: [unique, not_null]
+      - name: internet
+        tests:
+          - accepted_values:
+              arguments:
+                values: [dsl, fibre, aucun]
+      - name: contrat
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [mensuel, 1_an, 2_ans]
+      - name: paiement
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [cheque_electronique, cheque_postal, virement_auto, carte_auto]
+      - name: montant_mensuel
+        tests: [not_null]
+      - name: churn
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
