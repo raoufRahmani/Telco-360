@@ -48,14 +48,13 @@ def test_run_incremental(tmp_path):
 
 
 def test_run_s_arrete_sur_limite_429(tmp_path):
-    import httpx
     from openai import RateLimitError
 
     class Client429:
         def __init__(self):
             def create(**kwargs):
-                req = httpx.Request("POST", "https://x")
-                raise RateLimitError("429", response=httpx.Response(429, request=req), body=None)
+                # erreur 429 créée sans objet HTTP : le test ne dépend pas de la lib HTTP interne d'openai
+                raise RateLimitError.__new__(RateLimitError)
             self.chat = SimpleNamespace(completions=SimpleNamespace(create=create))
 
     db = tmp_path / "test.duckdb"
