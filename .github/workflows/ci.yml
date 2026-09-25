@@ -1,0 +1,38 @@
+# Intégration continue : à chaque push et pull request, on vérifie que le projet est sain.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  qualite-et-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Installer les dépendances (versions exactes de uv.lock)
+        run: uv sync --locked
+
+      - name: Lint (ruff check)
+        run: uv run ruff check .
+
+      - name: Formatage (ruff format)
+        run: uv run ruff format --check .
+
+      - name: Tests Python (pytest, sans réseau)
+        run: uv run pytest -q
+
+      - name: Base de test pour dbt (données fictives)
+        run: uv run python -m scripts.seed_ci
+
+      - name: dbt build (modèles + tests de données)
+        working-directory: transform
+        run: uv run dbt build --profiles-dir .
