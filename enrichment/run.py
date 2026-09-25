@@ -90,6 +90,7 @@ def run(
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)  # masque le log de chaque requête HTTP
+    logging.getLogger("httpx2").setLevel(logging.WARNING)
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=None, help="nb max d'avis à traiter")
     run(limit=parser.parse_args().limit)

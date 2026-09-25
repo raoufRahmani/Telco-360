@@ -8,6 +8,7 @@ dependencies = [
     "google-play-scraper>=1.2.7",
     "openai>=3.19.2",
     "pandas>=3.0.6",
+    "prefect>=3.8.6",
     "python-dotenv>=1.2.3",
     "tenacity>=9.1.4",
 ]
