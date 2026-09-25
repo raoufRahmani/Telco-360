@@ -1,4 +1,6 @@
 # Telco Customer 360 — Churn, Voix du Client & Rétention
+![CI](https://github.com/raoufRahmani/Telco-360/actions/workflows/ci.yml/badge.svg)
+
 
 Plateforme télécom end-to-end : prédiction de churn (ML), analyse de vrais avis
 clients (NLP + RAG) et moteur de rétention, avec une app Streamlit déployée.
