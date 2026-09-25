@@ -1,4 +1,5 @@
 """Tests de l'enrichissement sans réseau : le LLM est simulé."""
+
 import json
 from types import SimpleNamespace
 
@@ -14,9 +15,11 @@ class FakeClient:
     def __init__(self, reponse: dict):
         contenu = json.dumps(reponse)
         message = SimpleNamespace(content=contenu)
-        self.chat = SimpleNamespace(completions=SimpleNamespace(
-            create=lambda **kwargs: SimpleNamespace(choices=[SimpleNamespace(message=message)])
-        ))
+        self.chat = SimpleNamespace(
+            completions=SimpleNamespace(
+                create=lambda **kwargs: SimpleNamespace(choices=[SimpleNamespace(message=message)])
+            )
+        )
 
 
 def test_enrichir_reponse_valide():
@@ -40,8 +43,8 @@ def test_run_incremental(tmp_path):
 
     e = EnrichisseurLLM("fake", client=FakeClient({"motif": "reseau", "sentiment": "negatif"}))
     assert run(db, e, limit=2, pause=0) == 2  # limite respectée
-    assert run(db, e, pause=0) == 1           # seulement celui qui restait
-    assert run(db, e, pause=0) == 0           # tout est déjà fait
+    assert run(db, e, pause=0) == 1  # seulement celui qui restait
+    assert run(db, e, pause=0) == 0  # tout est déjà fait
 
     with duckdb.connect(str(db)) as con:
         assert con.execute("SELECT count(*) FROM enriched_avis").fetchone()[0] == 3
@@ -55,6 +58,7 @@ def test_run_s_arrete_sur_limite_429(tmp_path):
             def create(**kwargs):
                 # erreur 429 créée sans objet HTTP : le test ne dépend pas de la lib HTTP interne d'openai
                 raise RateLimitError.__new__(RateLimitError)
+
             self.chat = SimpleNamespace(completions=SimpleNamespace(create=create))
 
     db = tmp_path / "test.duckdb"

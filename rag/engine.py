@@ -8,8 +8,7 @@ class MoteurRAG:
         self.vector_store = vector_store
         self.llm = llm
 
-    def repondre(self, question: str, operateur: str | None = None,
-                 motif: str | None = None) -> dict:
+    def repondre(self, question: str, operateur: str | None = None, motif: str | None = None) -> dict:
         """Retrieve (filtré) -> génère -> retourne réponse + avis sources.
 
         Garde-fou : si aucun contexte pertinent, le dire au lieu d'inventer.

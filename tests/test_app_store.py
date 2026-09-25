@@ -1,4 +1,5 @@
 """Test de l'AppStoreCollector sans appel réseau (le flux Apple est simulé)."""
+
 from ingestion.app_store import AppStoreCollector
 from ingestion.base import AvisCollector
 
@@ -24,7 +25,9 @@ FAKE_PAGE = [
 def test_collect_schema_dedup_et_pagination(monkeypatch):
     col = AppStoreCollector(["sfr"], nb_pages=3)
     # page 1 = avis, page 2 = vide -> la boucle doit s'arrêter
-    monkeypatch.setattr(col, "_fetch_page", lambda app_id, page, sort="mostrecent": FAKE_PAGE if page == 1 else [])
+    monkeypatch.setattr(
+        col, "_fetch_page", lambda app_id, page, sort="mostrecent": FAKE_PAGE if page == 1 else []
+    )
 
     df = col.collect()
 
@@ -43,7 +46,9 @@ def test_operateur_sans_app_id_est_ignore():
 def test_bascule_sur_mosthelpful_si_mostrecent_vide(monkeypatch):
     col = AppStoreCollector(["sfr"], nb_pages=1)
     # comme SFR en vrai : mostrecent vide, mosthelpful rempli
-    monkeypatch.setattr(col, "_fetch_page", lambda app_id, page, sort="mostrecent": FAKE_PAGE if sort == "mosthelpful" else [])
+    monkeypatch.setattr(
+        col, "_fetch_page", lambda app_id, page, sort="mostrecent": FAKE_PAGE if sort == "mosthelpful" else []
+    )
     assert len(col.collect()) == 2
 
 

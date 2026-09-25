@@ -1,5 +1,7 @@
 """Classe de base pour les collecteurs d'avis (POO : abstraction commune)."""
+
 from abc import ABC, abstractmethod
+
 import pandas as pd
 
 

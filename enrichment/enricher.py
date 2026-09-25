@@ -1,4 +1,5 @@
 """Enrichissement des avis par LLM (motif, sentiment) — sortie JSON."""
+
 import json
 
 from openai import OpenAI, RateLimitError
@@ -33,8 +34,11 @@ class EnrichisseurLLM:
         self.prompt = PROMPT.format(motifs=self.MOTIFS, sentiments=self.SENTIMENTS)
 
     # pas de retry sur 429 (limite de requêtes) : le client openai réessaie déjà, puis run.py s'arrête
-    @retry(retry=retry_if_not_exception_type(RateLimitError),
-           stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=30))
+    @retry(
+        retry=retry_if_not_exception_type(RateLimitError),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(min=2, max=30),
+    )
     def enrichir(self, texte: str) -> dict:
         """Retourne {motif, sentiment}. Retenté 3 fois si l'appel ou le JSON plante."""
         resp = self.client.chat.completions.create(

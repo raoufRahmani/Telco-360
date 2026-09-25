@@ -1,4 +1,5 @@
 """Test du GooglePlayCollector sans appel réseau (Google Play est simulé)."""
+
 from datetime import datetime
 
 from ingestion.base import AvisCollector

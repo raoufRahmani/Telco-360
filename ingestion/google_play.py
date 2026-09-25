@@ -1,6 +1,7 @@
 """Collecteur d'avis Google Play (source principale)."""
-from datetime import datetime, timezone
+
 import logging
+from datetime import UTC, datetime
 
 import pandas as pd
 from google_play_scraper import Sort, reviews
@@ -12,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 # Opérateur -> app_id Google Play (l'id est dans l'URL de la fiche : ...details?id=<app_id>)
 APP_IDS = {
-    "orange": "com.orange.orangeetmoi",            # Orange et moi
-    "sfr": "com.sfr.android.moncompte",            # SFR & Moi
+    "orange": "com.orange.orangeetmoi",  # Orange et moi
+    "sfr": "com.sfr.android.moncompte",  # SFR & Moi
     "bouygues": "fr.bouyguestelecom.ecm.android",  # Bouygues Telecom (espace client)
     "free": None,  # TODO: coller l'id de l'appli Free Mobile depuis sa fiche Play Store
 }
@@ -53,18 +54,20 @@ class GooglePlayCollector(AvisCollector):
             if not raw:
                 continue
 
-            df = pd.DataFrame(raw).rename(columns={
-                "reviewId": "id",
-                "score": "note",
-                "content": "texte",
-                "at": "date",
-            })
+            df = pd.DataFrame(raw).rename(
+                columns={
+                    "reviewId": "id",
+                    "score": "note",
+                    "content": "texte",
+                    "at": "date",
+                }
+            )
             df["operateur"] = op
             frames.append(df)
 
         df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
         df["source"] = "google_play"
-        df["ingested_at"] = datetime.now(timezone.utc)
+        df["ingested_at"] = datetime.now(UTC)
         if "id" in df.columns:
             df = df.drop_duplicates(subset="id")
         return self.normaliser(df)

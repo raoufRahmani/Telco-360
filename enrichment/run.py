@@ -2,6 +2,7 @@
 
 Usage : python -m enrichment.run --limit 20   (sans --limit : tous les avis restants)
 """
+
 import argparse
 import logging
 import os
@@ -41,8 +42,12 @@ ORDER BY r.date DESC
 """
 
 
-def run(db_path: Path = DB_PATH, enrichisseur: EnrichisseurLLM | None = None,
-        limit: int | None = None, pause: float = 1.0) -> int:
+def run(
+    db_path: Path = DB_PATH,
+    enrichisseur: EnrichisseurLLM | None = None,
+    limit: int | None = None,
+    pause: float = 1.0,
+) -> int:
     """Enrichit les avis restants, un par un. Retourne le nb d'avis enrichis."""
     if enrichisseur is None:
         load_dotenv()

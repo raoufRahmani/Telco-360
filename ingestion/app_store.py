@@ -1,8 +1,9 @@
 """Collecteur d'avis App Store (source complémentaire, remplace Reddit dont l'API est fermée)."""
-from datetime import datetime, timezone
+
 import json
 import logging
 import urllib.request
+from datetime import UTC, datetime
 
 import pandas as pd
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -13,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 # Opérateur -> id App Store (l'id est dans l'URL de la fiche : .../app/.../id<app_id>)
 APP_IDS = {
-    "orange": "367722531",    # Orange et moi France
-    "sfr": "326161564",       # SFR & Moi
+    "orange": "367722531",  # Orange et moi France
+    "sfr": "326161564",  # SFR & Moi
     "bouygues": "422590767",  # Bouygues Telecom (espace client)
     "free": None,  # TODO: coller l'id de l'appli Free depuis sa fiche App Store
 }
@@ -65,19 +66,21 @@ class AppStoreCollector(AvisCollector):
                 for e in entries:
                     if "im:rating" not in e:
                         continue  # entrée "fiche appli", pas un avis
-                    rows.append({
-                        "id": e["id"]["label"],
-                        "operateur": op,
-                        "note": int(e["im:rating"]["label"]),
-                        # titre + texte : sur l'App Store le titre porte souvent le motif
-                        "texte": f'{e["title"]["label"]}. {e["content"]["label"]}',
-                        "date": pd.to_datetime(e["updated"]["label"]),
-                    })
+                    rows.append(
+                        {
+                            "id": e["id"]["label"],
+                            "operateur": op,
+                            "note": int(e["im:rating"]["label"]),
+                            # titre + texte : sur l'App Store le titre porte souvent le motif
+                            "texte": f"{e['title']['label']}. {e['content']['label']}",
+                            "date": pd.to_datetime(e["updated"]["label"]),
+                        }
+                    )
             logger.info("%s : %d avis cumulés", op, len(rows))
 
         df = pd.DataFrame(rows)
         df["source"] = "app_store"
-        df["ingested_at"] = datetime.now(timezone.utc)
+        df["ingested_at"] = datetime.now(UTC)
         if "id" in df.columns:
             df = df.drop_duplicates(subset="id")
         return self.normaliser(df)
