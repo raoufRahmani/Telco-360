@@ -44,3 +44,13 @@ jobs:
       - name: Fraîcheur des sources
         working-directory: transform
         run: uv run dbt source freshness --profiles-dir .
+
+  docker:
+    # vérifie que l'image Docker se construit toujours
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Construire l'image
+        run: docker build -t telco360-pipeline .

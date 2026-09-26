@@ -1,0 +1,17 @@
+# Ce qui ne doit jamais entrer dans l'image Docker
+.git/
+.github/
+.venv/
+.env
+data/
+notebooks/
+docs/
+tests/
+scripts/
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+transform/target/
+transform/logs/
+transform/dbt_packages/
+transform/.user.yml

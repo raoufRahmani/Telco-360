@@ -1,0 +1,12 @@
+# Lancer le pipeline dans Docker, sans rien installer d'autre que Docker.
+#   docker compose build                                              # construire l'image
+#   docker compose run --rm pipeline                                  # un run complet
+#   docker compose run --rm pipeline python -m flows.pipeline --limit 20
+#   docker compose run --rm pipeline python -m flows.suivi            # voir les derniers runs
+services:
+  pipeline:
+    build: .
+    image: telco360-pipeline
+    env_file: .env          # clé API du LLM (jamais copiée dans l'image)
+    volumes:
+      - ./data:/app/data    # la base DuckDB et le CSV restent sur ta machine
