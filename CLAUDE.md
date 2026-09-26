@@ -19,15 +19,21 @@ Communication : français, concis, informel. Modifs minimales, code simple et li
 - Enrichissement : `uv run python -m enrichment.run [--limit N]`
 - dbt : `cd transform && uv run dbt build --profiles-dir .`
 - Tests : `uv run pytest -q` · Lint : `uv run ruff check .` · Format : `uv run ruff format .`
-- Base fictive (CI / tests dbt) : `uv run python -m scripts.seed_ci`
+- Base fictive (CI / tests dbt) : `uv run python -m scripts.seed_ci` (refuse de tourner si des données existent)
+- Pipeline complet (Prefect) : `uv run python -m flows.pipeline [--limit N] [--serve]` · suivi : `uv run python -m flows.suivi`
+- dbt : `uv run dbt deps` (1re fois), `dbt source freshness`, `dbt docs generate/serve`
+- Docker : `docker compose build` puis `docker compose run --rm pipeline` (virtualisation désactivée sur le PC de Raouf : l'image est validée par la CI)
 
 ## Fait
 - `ingestion/` : `AvisCollector` (abstrait, schéma commun) → `GooglePlayCollector` (google-play-scraper) et `AppStoreCollector` (flux RSS public Apple, fallback de tri mostrecent → mosthelpful). `run.py` charge la table DuckDB `raw_avis` (`data/telco360.duckdb`), clé (source, id), `INSERT OR IGNORE` = incrémental et idempotent. 2 450 avis.
 - `enrichment/` : `EnrichisseurLLM` (client openai compatible, Mistral `ministral-8b-latest`), JSON motif + sentiment, valeurs hors liste ramenées à autre/neutre, arrêt net sur 429. Table `enriched_avis`, incrémentale. 2 450 avis enrichis.
-- `transform/` (dbt-duckdb) : `stg_avis` (vue), `stg_churn` (table, lit le CSV Kaggle dans `data/`), `mart_motifs_operateur` (table). 24 modèles + tests.
+- `transform/` (dbt-duckdb + dbt_utils) : staging (`stg_raw_avis`, `stg_enriched_avis`, `stg_churn` en table car lit le CSV Kaggle) → intermediate (`int_avis_enrichis`, incrémental) → marts (`mart_motifs_operateur`). Source freshness sur `ingested_at` / `enriched_at`. 31 tests de données dont un test métier SQL (`tests/`). 3 040 avis enrichis.
 - `notebooks/01_eda_churn.ipynb` : EDA churn (7 043 clients, 26,5 % churn ; contrat mensuel 43 %, fibre 42 %, chèque électronique 45 %). Figure dans `docs/img/`.
 - Qualité : 11 tests pytest sans réseau (monkeypatch), ruff (lint + format), pre-commit (ruff, garde-fous `.env` et gros fichiers).
-- CI GitHub Actions (`.github/workflows/ci.yml`) : uv sync --locked → ruff → pytest → base fictive → dbt build.
+- `flows/` : flow Prefect ingestion → enrichissement → dbt (retries sur l'ingestion) + table `pipeline_runs` (durée, statut, lignes, erreur).
+- Docker : `Dockerfile` (python 3.13-slim + uv, deps de uv.lock sans dev, dbt deps), `.dockerignore` (pas de .env ni data), `docker-compose.yml` (data/ monté, .env au lancement).
+- CI GitHub Actions : job qualite-et-tests (uv sync --locked → ruff → pytest → base fictive → dbt deps/build → freshness) + job docker (build de l'image).
+- 14 tests pytest. README complet (architecture Mermaid, résultats, lancement, limites).
 
 ## Décisions / limites connues
 - Reddit abandonné (création d'app bloquée, Responsible Builder Policy) → App Store à la place.
@@ -39,8 +45,9 @@ Communication : français, concis, informel. Modifs minimales, code simple et li
 ## Plan (orientation data engineer)
 - ✅ A. Fondations : uv, nettoyage du repo, ruff, pre-commit
 - ✅ B. CI GitHub Actions
-- ⏭️ C. Orchestration (flow Prefect ingestion → enrichissement → dbt) + table `pipeline_runs` + logs ; option : couche bronze en Parquet partitionné
-- D. dbt rigoureux : couche intermediate, modèles incrémentaux, source freshness, dbt_utils, dbt docs (lineage)
-- E. Docker (Dockerfile + compose)
-- F. README avec schéma d'architecture, installation (`uv sync`), modèle de données, limites
-- Ensuite (plus léger) : modèle churn (baseline logistique vs XGBoost, SHAP), RAG, app Streamlit ; bonus : déploiement Azure.
+- ✅ C. Orchestration Prefect + `pipeline_runs`
+- ✅ D. dbt rigoureux : couches, incrémental, freshness, dbt_utils, test métier, docs
+- ✅ E. Docker (validé par la CI)
+- ✅ F. README
+- ⏭️ Ensuite : modèle churn (baseline logistique vs XGBoost, SHAP) dans `modeling/` (stub `ModeleChurn`), puis RAG, app Streamlit ; bonus : déploiement Azure ; option : couche bronze Parquet.
+- À faire à la fin : guide HTML qui explique tout le projet simplement (préparation entretiens).
