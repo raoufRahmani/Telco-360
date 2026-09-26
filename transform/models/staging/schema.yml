@@ -1,35 +1,50 @@
 version: 2
 
 models:
-  - name: stg_avis
-    description: Avis nettoyés + motif et sentiment (1 ligne par avis enrichi)
+  - name: stg_raw_avis
+    description: Avis bruts nettoyés (texte, date), 1 ligne par avis collecté
     columns:
       - name: avis_key
-        tests: [unique, not_null]
+        description: Clé unique "source:id"
+        data_tests: [unique, not_null]
       - name: source
-        tests:
+        data_tests:
           - accepted_values:
               arguments:
                 values: [google_play, app_store]
       - name: operateur
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
               arguments:
                 values: [orange, sfr, bouygues, free]
       - name: note
-        tests:
-          - accepted_values:
+        description: Note de 1 à 5 étoiles
+        data_tests:
+          - dbt_utils.accepted_range:
               arguments:
-                values: [1, 2, 3, 4, 5]
-                quote: false
+                min_value: 1
+                max_value: 5
+
+  - name: stg_enriched_avis
+    description: Motif et sentiment attribués par le LLM, 1 ligne par avis enrichi
+    columns:
+      - name: avis_key
+        data_tests:
+          - unique
+          - not_null
+          # chaque avis enrichi doit exister dans les avis bruts
+          - relationships:
+              arguments:
+                to: ref('stg_raw_avis')
+                field: avis_key
       - name: motif
-        tests:
+        data_tests:
           - accepted_values:
               arguments:
                 values: [reseau, facturation, resiliation, service_client, autre]
       - name: sentiment
-        tests:
+        data_tests:
           - accepted_values:
               arguments:
                 values: [positif, neutre, negatif]
@@ -38,28 +53,28 @@ models:
     description: Clients Kaggle nettoyés (types, noms en français, churn en 0/1)
     columns:
       - name: customer_id
-        tests: [unique, not_null]
+        data_tests: [unique, not_null]
       - name: internet
-        tests:
+        data_tests:
           - accepted_values:
               arguments:
                 values: [dsl, fibre, aucun]
       - name: contrat
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
               arguments:
                 values: [mensuel, 1_an, 2_ans]
       - name: paiement
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
               arguments:
                 values: [cheque_electronique, cheque_postal, virement_auto, carte_auto]
       - name: montant_mensuel
-        tests: [not_null]
+        data_tests: [not_null]
       - name: churn
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
               arguments:

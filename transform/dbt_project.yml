@@ -3,10 +3,13 @@ version: "1.0.0"
 profile: telco360
 
 model-paths: ["models"]
+test-paths: ["tests"]
 
 models:
   telco360:
     staging:
-      +materialized: view    # vue : toujours à jour, ne prend pas de place
+      +materialized: view    # vue : nettoyage léger, toujours à jour
+    intermediate:
+      +materialized: table   # logique métier (jointures), écrasé par config incrémentale si besoin
     marts:
-      +materialized: table   # table : prête à être lue par l'app / le notebook
+      +materialized: table   # tables finales, prêtes pour l'app / les notebooks

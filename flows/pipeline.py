@@ -8,6 +8,7 @@ Usage :
 
 import argparse
 import subprocess
+from pathlib import Path
 
 from prefect import flow, get_run_logger, task
 
@@ -33,6 +34,8 @@ def enrichissement(run_id: str, limit: int | None) -> int:
 @task
 def dbt_build(run_id: str) -> None:
     with suivre(run_id, "dbt_build"):
+        if not Path("transform/dbt_packages").exists():  # 1er lancement : installe dbt_utils
+            subprocess.run(["dbt", "deps"], cwd="transform", check=True)
         # check=True : si un modèle ou un test dbt échoue, l'étape (et le flow) échoue
         subprocess.run(["dbt", "build", "--profiles-dir", "."], cwd="transform", check=True)
 

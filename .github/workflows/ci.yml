@@ -33,6 +33,14 @@ jobs:
       - name: Base de test pour dbt (données fictives)
         run: uv run python -m scripts.seed_ci
 
+      - name: Paquets dbt (dbt_utils)
+        working-directory: transform
+        run: uv run dbt deps
+
       - name: dbt build (modèles + tests de données)
         working-directory: transform
         run: uv run dbt build --profiles-dir .
+
+      - name: Fraîcheur des sources
+        working-directory: transform
+        run: uv run dbt source freshness --profiles-dir .

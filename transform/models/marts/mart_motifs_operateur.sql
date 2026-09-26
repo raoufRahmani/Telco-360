@@ -1,6 +1,6 @@
 -- Par opérateur et par motif : volume, part des plaintes, note moyenne
 with base as (
-    select * from {{ ref('stg_avis') }}
+    select * from {{ ref('int_avis_enrichis') }}
 )
 
 select

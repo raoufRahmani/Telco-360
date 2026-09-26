@@ -1,14 +1,23 @@
 version: 2
 
-# Tables brutes écrites par les scripts Python (ingestion/run.py, enrichment/run.py)
 sources:
+  # Tables brutes écrites par les scripts Python (ingestion/run.py, enrichment/run.py)
   - name: raw
     schema: main
+    config:
+      # alerte si l'ingestion n'a pas tourné depuis longtemps : `dbt source freshness`
+      freshness:
+        warn_after: {count: 2, period: day}
+        error_after: {count: 7, period: day}
     tables:
       - name: raw_avis
         description: Avis bruts Google Play + App Store (1 ligne par avis)
+        config:
+          loaded_at_field: ingested_at
       - name: enriched_avis
         description: Motif + sentiment de chaque avis, donnés par le LLM
+        config:
+          loaded_at_field: enriched_at
 
   # Dataset Kaggle Telco Customer Churn, lu directement depuis le CSV dans data/
   - name: kaggle

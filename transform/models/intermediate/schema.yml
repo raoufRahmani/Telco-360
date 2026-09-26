@@ -1,0 +1,13 @@
+version: 2
+
+models:
+  - name: int_avis_enrichis
+    description: >
+      Avis + enrichissement LLM réunis (modèle incrémental).
+      Base de toutes les analyses sur les avis.
+    columns:
+      - name: avis_key
+        data_tests: [unique, not_null]
+      - name: est_negatif
+        description: Vrai si le LLM a classé l'avis en sentiment négatif
+        data_tests: [not_null]

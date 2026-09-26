@@ -5,10 +5,28 @@ models:
     description: >
       Répartition des motifs par opérateur. C'est le pont avec la couche churn :
       les 4 motifs (reseau, facturation, resiliation, service_client) + autre.
+    data_tests:
+      # une seule ligne par couple (opérateur, motif)
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [operateur, motif]
     columns:
       - name: operateur
-        tests: [not_null]
+        data_tests: [not_null]
       - name: motif
-        tests: [not_null]
+        data_tests: [not_null]
       - name: n_avis
-        tests: [not_null]
+        data_tests: [not_null]
+      - name: pct_des_negatifs
+        description: Part de ce motif dans les avis négatifs de l'opérateur (%)
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: note_moyenne
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 5
