@@ -5,7 +5,7 @@ Communication : français, concis, informel. Modifs minimales, code simple et li
 
 ## Concept
 - Couche avis (réelle) : avis clients Orange / SFR / Bouygues → enrichissement LLM (motif, sentiment) → analyses dbt → (plus tard) RAG.
-- Couche churn : dataset Kaggle Telco Customer Churn → (plus tard) XGBoost + SHAP.
+- Couche churn : dataset Kaggle Telco Customer Churn → logistique vs XGBoost + SHAP.
 - Pont = 4 motifs : réseau, facturation, résiliation, service client. Avis et clients Kaggle ne sont PAS joignables (limite assumée).
 
 ## Environnement
@@ -33,7 +33,8 @@ Communication : français, concis, informel. Modifs minimales, code simple et li
 - `flows/` : flow Prefect ingestion → enrichissement → dbt (retries sur l'ingestion) + table `pipeline_runs` (durée, statut, lignes, erreur).
 - Docker : `Dockerfile` (python 3.13-slim + uv, deps de uv.lock sans dev, dbt deps), `.dockerignore` (pas de .env ni data), `docker-compose.yml` (data/ monté, .env au lancement).
 - CI GitHub Actions : job qualite-et-tests (uv sync --locked → ruff → pytest → base fictive → dbt deps/build → freshness) + job docker (build de l'image).
-- 14 tests pytest. README complet (architecture Mermaid, résultats, lancement, limites).
+- `modeling/churn_model.py` : `ModeleChurn` (logistique | xgboost, déséquilibre compensé, SHAP par client, save/load joblib), `importance_par_motif`. Notebook `02_modele_churn` : ROC-AUC test 0,838 (logit) / 0,839 (XGB), rappel ≈ 0,77. Pont SHAP vs plaintes : résiliation 40,9 / 4,3 ; facturation 33,9 / 26,1 ; réseau 20,3 / 40,2 ; service client 4,9 / 29,5.
+- 24 tests pytest. README complet (architecture Mermaid, résultats avis + churn + pont, lancement, limites).
 
 ## Décisions / limites connues
 - Reddit abandonné (création d'app bloquée, Responsible Builder Policy) → App Store à la place.
@@ -49,5 +50,6 @@ Communication : français, concis, informel. Modifs minimales, code simple et li
 - ✅ D. dbt rigoureux : couches, incrémental, freshness, dbt_utils, test métier, docs
 - ✅ E. Docker (validé par la CI)
 - ✅ F. README
-- ⏭️ Ensuite : modèle churn (baseline logistique vs XGBoost, SHAP) dans `modeling/` (stub `ModeleChurn`), puis RAG, app Streamlit ; bonus : déploiement Azure ; option : couche bronze Parquet.
+- ✅ G. Modèle churn (logistique vs XGBoost, SHAP, pont motifs)
+- ⏭️ Ensuite : RAG (mistral-embed → table DuckDB `avis_embeddings`, cosinus en SQL, `MoteurRAG` dans `rag/`, réponses sourcées + « je ne sais pas »), puis app Streamlit ; bonus : déploiement Azure ; option : couche bronze Parquet.
 - À faire à la fin : guide HTML qui explique tout le projet simplement (préparation entretiens).

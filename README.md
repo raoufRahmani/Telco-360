@@ -52,6 +52,7 @@ Toutes les tables vivent dans un seul fichier **DuckDB** (`data/telco360.duckdb`
 | Ingestion | Python (POO), `google-play-scraper`, flux RSS Apple, `tenacity` | sources hétérogènes derrière une interface commune |
 | Enrichissement | LLM **Mistral** via client `openai` compatible | changer de fournisseur (Mistral, Azure OpenAI, Groq…) = changer le `.env` |
 | Transformation | **dbt** (dbt-duckdb, dbt_utils) | SQL versionné, testé, documenté |
+| Machine learning | **scikit-learn**, **XGBoost**, **SHAP** | baseline interprétable vs boosting, explications par client |
 | Orchestration | **Prefect** | pipeline en une commande, retries, planification |
 | Qualité | **pytest**, **ruff**, **pre-commit** | tests sans réseau, lint + format automatiques |
 | CI | **GitHub Actions** | chaque push : lint, tests, dbt build, build Docker |
@@ -107,11 +108,48 @@ L'intention de partir ne se lit pas dans les avis mais dans le **contrat** : les
 
 ![Churn par variable](docs/img/churn_par_variable.png)
 
+### Modèle de churn — `modeling/churn_model.py`, `notebooks/02_modele_churn.ipynb`
+
+Classe `ModeleChurn` : même interface pour une **régression logistique** (baseline) et **XGBoost**,
+déséquilibre des classes compensé (`class_weight` / `scale_pos_weight`), explications **SHAP** par client.
+
+| Modèle | ROC-AUC (CV 5 plis) | ROC-AUC test | PR-AUC | Rappel | Précision |
+|---|---|---|---|---|---|
+| Régression logistique | 0,845 ± 0,012 | 0,838 | 0,628 | 0,773 | 0,506 |
+| XGBoost | 0,842 ± 0,011 | 0,839 | 0,651 | 0,775 | 0,519 |
+
+- **XGBoost ≈ logistique** : sur ce dataset, le signal est surtout linéaire. XGBoost gagne un peu en PR-AUC,
+  la logistique reste plus simple à expliquer. On garde les deux, comparés honnêtement.
+- On détecte **~3 partants sur 4** (rappel 0,77), au prix d'une fausse alerte sur deux : acceptable
+  pour une campagne de rétention peu coûteuse.
+- Facteurs SHAP principaux : contrat mensuel, faible ancienneté, montant mensuel élevé, fibre.
+
+![Courbes ROC et PR](docs/img/modele_courbes.png)
+![Importance SHAP](docs/img/shap_importance.png)
+
+### Le pont : ce qui fait partir vs ce dont on se plaint
+
+Part de chaque motif dans le **signal de churn** (importance SHAP, XGBoost) et dans les **plaintes** (avis négatifs) :
+
+| Motif | Poids dans le churn | Part des plaintes |
+|---|---|---|
+| Résiliation (contrat) | **40,9 %** | 4,3 % |
+| Facturation | 33,9 % | 26,1 % |
+| Réseau | 20,3 % | **40,2 %** |
+| Service client | 4,9 % | 29,5 % |
+
+**Lecture :** ce qui fait partir les clients (engagement contractuel, prix) n'est **pas** ce dont ils se
+plaignent le plus (réseau, service client). La **facturation** est le seul motif fort des deux côtés :
+c'est le levier prioritaire. Les avis mesurent l'irritation, le contrat mesure le risque de départ —
+deux sources complémentaires, pas redondantes.
+
+![Pont motifs](docs/img/pont_motifs.png)
+
 ---
 
 ## Qualité et fiabilité
 
-- **14 tests pytest**, sans réseau ni clé API (sources et LLM simulés).
+- **24 tests pytest**, sans réseau ni clé API (sources et LLM simulés, modèle entraîné sur des clients fictifs).
 - **31 tests de données dbt** : unicité, valeurs autorisées, intégrité référentielle, bornes (`dbt_utils`)
   et un **test métier** SQL (les parts de motifs somment à 100 % par opérateur).
 - **Fraîcheur des sources** : alerte si l'ingestion n'a pas tourné depuis 2 jours, erreur au-delà de 7.
@@ -178,7 +216,8 @@ ingestion/     collecteurs d'avis (Google Play, App Store) + chargement DuckDB
 enrichment/    enrichissement LLM (motif, sentiment)
 transform/     projet dbt : staging → intermediate → marts, tests, sources
 flows/         orchestration Prefect + suivi des runs (pipeline_runs)
-notebooks/     exploration (EDA churn)
+modeling/      modèle de churn (logistique vs XGBoost, SHAP)
+notebooks/     EDA churn, modèle de churn
 scripts/       base fictive pour la CI
 tests/         tests pytest (sans réseau)
 docs/          énoncé du projet, figures
@@ -204,7 +243,7 @@ docs/          énoncé du projet, figures
 
 ## Suite du projet
 
-- [ ] Modèle de churn : baseline régression logistique vs **XGBoost**, explicabilité **SHAP**
+- [x] Modèle de churn : baseline régression logistique vs **XGBoost**, explicabilité **SHAP**
 - [ ] **RAG** sur les avis : questions en langage naturel, réponses sourcées
 - [ ] Application **Streamlit**
 - [ ] Déploiement **Azure** (stockage Blob pour la couche brute, job planifié)
