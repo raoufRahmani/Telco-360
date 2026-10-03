@@ -1,4 +1,4 @@
-"""Pipeline complet orchestré avec Prefect : ingestion -> enrichissement LLM -> dbt build.
+"""Pipeline complet orchestré avec Prefect : ingestion -> enrichissement LLM -> dbt build -> vectorisation (RAG).
 
 Usage :
     uv run python -m flows.pipeline              # une exécution complète
@@ -15,6 +15,7 @@ from prefect import flow, get_run_logger, task
 from enrichment.run import run as enrichir_avis
 from flows.suivi import nouveau_run_id, suivre
 from ingestion.run import run as ingerer_avis
+from rag.run import run as vectoriser_avis
 
 
 @task(retries=2, retry_delay_seconds=60)  # Google Play / Apple peuvent échouer ponctuellement
@@ -40,6 +41,13 @@ def dbt_build(run_id: str) -> None:
         subprocess.run(["dbt", "build", "--profiles-dir", "."], cwd="transform", check=True)
 
 
+@task  # pas de retry : rag.run s'arrête déjà proprement sur limite de requêtes (429)
+def vectorisation(run_id: str) -> int:
+    with suivre(run_id, "vectorisation") as r:
+        r["lignes"] = vectoriser_avis()  # lit int_avis_enrichis : doit passer après dbt
+    return r["lignes"]
+
+
 @flow(name="telco360-pipeline")
 def pipeline(limit: int | None = None) -> None:
     """Les étapes s'enchaînent dans l'ordre ; si l'une échoue, les suivantes ne tournent pas."""
@@ -50,8 +58,15 @@ def pipeline(limit: int | None = None) -> None:
     nouveaux = ingestion(run_id)
     enrichis = enrichissement(run_id, limit)
     dbt_build(run_id)
+    vectorises = vectorisation(run_id)
 
-    logger.info("Run %s terminé : %s nouveaux avis, %s enrichis", run_id, nouveaux, enrichis)
+    logger.info(
+        "Run %s terminé : %s nouveaux avis, %s enrichis, %s vectorisés",
+        run_id,
+        nouveaux,
+        enrichis,
+        vectorises,
+    )
 
 
 if __name__ == "__main__":
