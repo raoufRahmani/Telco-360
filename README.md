@@ -7,7 +7,8 @@
 Pipeline de données **de bout en bout** : collecte de vrais avis clients d'opérateurs télécom français
 (Orange, SFR, Bouygues), enrichissement par **LLM** (motif + sentiment), modélisation **dbt**,
 orchestration **Prefect**, le tout testé, conteneurisé et vérifié en **CI**.
-En parallèle, un dataset de churn (Kaggle) sert à étudier ce qui fait partir les clients.
+Par-dessus : un **RAG** qui répond aux questions en citant les avis, un **modèle de churn** expliqué par SHAP
+(dataset Kaggle) et une **application Streamlit** qui réunit le tout.
 
 > **La question métier :** de quoi se plaignent vraiment les clients télécom, et est-ce que ces plaintes
 > rejoignent les facteurs qui font partir les clients ?
@@ -33,9 +34,18 @@ flowchart LR
         STGC[staging<br/>stg_churn]
     end
 
+    INT --> EMB[rag/<br/>mistral-embed]
+    EMB --> VEC[(avis_embeddings)]
+    VEC --> RAG[MoteurRAG<br/>cosinus SQL + LLM]
+    STGC --> ML[modeling/<br/>logistique vs XGBoost<br/>SHAP]
+    RAG --> APP[[app Streamlit]]
+    MART --> APP
+    ML --> APP
+
     PREFECT{{Prefect<br/>flows/pipeline.py}} -.orchestre.-> ING
     PREFECT -.-> ENR
     PREFECT -.-> DBT
+    PREFECT -.-> EMB
     PREFECT -.trace.-> RUNS[(pipeline_runs)]
 ```
 
@@ -52,6 +62,8 @@ Toutes les tables vivent dans un seul fichier **DuckDB** (`data/telco360.duckdb`
 | Ingestion | Python (POO), `google-play-scraper`, flux RSS Apple, `tenacity` | sources hétérogènes derrière une interface commune |
 | Enrichissement | LLM **Mistral** via client `openai` compatible | changer de fournisseur (Mistral, Azure OpenAI, Groq…) = changer le `.env` |
 | Transformation | **dbt** (dbt-duckdb, dbt_utils) | SQL versionné, testé, documenté |
+| RAG | **mistral-embed** + similarité cosinus dans **DuckDB** | pas de base vectorielle en plus : vecteurs et filtres au même endroit |
+| Application | **Streamlit** | démonstration interactive en un fichier Python |
 | Machine learning | **scikit-learn**, **XGBoost**, **SHAP** | baseline interprétable vs boosting, explications par client |
 | Orchestration | **Prefect** | pipeline en une commande, retries, planification |
 | Qualité | **pytest**, **ruff**, **pre-commit** | tests sans réseau, lint + format automatiques |
@@ -74,6 +86,8 @@ Toutes les tables vivent dans un seul fichier **DuckDB** (`data/telco360.duckdb`
    - **marts** : `mart_motifs_operateur`, table d'analyse finale.
 4. **Orchestration** (`flows/`) — un flow Prefect enchaîne les trois étapes ; chaque étape écrit une ligne
    dans **`pipeline_runs`** (durée, statut, lignes ajoutées, erreur) : on sait toujours ce qui a tourné.
+5. **Vectorisation** (`rag/run.py`) — chaque avis enrichi devient un vecteur de 1 024 dimensions
+   (`mistral-embed`), stocké dans la table DuckDB `avis_embeddings`. Incrémental, par lots, arrêt propre sur 429.
 
 ![Lignage dbt](docs/img/dbt_lineage.png)
 
@@ -145,11 +159,40 @@ deux sources complémentaires, pas redondantes.
 
 ![Pont motifs](docs/img/pont_motifs.png)
 
+### RAG — interroger les avis en langage naturel (`rag/engine.py`)
+
+`MoteurRAG` vectorise la question, retrouve les 8 avis les plus proches (similarité cosinus calculée en SQL
+par DuckDB, filtrable par opérateur et par motif), puis fait répondre le LLM **uniquement** à partir de ces avis,
+en les citant `[n]`.
+
+```text
+$ uv run python -m rag.engine "Pourquoi les clients se plaignent du réseau ?"
+Les clients se plaignent principalement de la qualité instable du réseau [2, 3, 4, 5, 6, 7] :
+coupures fréquentes [4], connexions défaillantes [3], zones inaccessibles depuis des mois [7]...
+[2] orange · reseau · 1/5 · sim 0.83   réseau toujours aussi pourri, par contre les factures augmentent
+...
+$ uv run python -m rag.engine "Quelle est la recette de la tarte aux pommes ?"
+Je ne sais pas : les avis disponibles ne permettent pas de répondre à cette question.
+```
+
+**Garde-fous :** (1) aucun avis assez proche → « je ne sais pas » sans appeler le LLM ; (2) le prompt interdit
+d'inventer et impose les citations ; (3) seuls les avis **réellement cités** sont renvoyés comme sources.
+**Constat mesuré :** avec `mistral-embed`, les similarités sont tassées (≈ 0,80-0,83 pour une question pertinente,
+encore ≈ 0,77-0,79 hors sujet) : un seuil seul ne suffit pas, c'est le garde-fou du prompt qui tranche.
+
+### Application Streamlit (`app.py`)
+
+Trois onglets : **interroger les avis** (RAG avec sources dépliables), **motifs par opérateur** (mart dbt),
+**risque de churn** (clients les plus à risque, facteurs SHAP rattachés aux motifs).
+
+![App — RAG](docs/img/app_rag.png)
+![App — churn](docs/img/app_churn.png)
+
 ---
 
 ## Qualité et fiabilité
 
-- **24 tests pytest**, sans réseau ni clé API (sources et LLM simulés, modèle entraîné sur des clients fictifs).
+- **35 tests pytest**, sans réseau ni clé API (sources, LLM et embeddings simulés, modèle entraîné sur des clients fictifs).
 - **31 tests de données dbt** : unicité, valeurs autorisées, intégrité référentielle, bornes (`dbt_utils`)
   et un **test métier** SQL (les parts de motifs somment à 100 % par opérateur).
 - **Fraîcheur des sources** : alerte si l'ingestion n'a pas tourné depuis 2 jours, erreur au-delà de 7.
@@ -176,7 +219,7 @@ uv sync
 cp .env.example .env        # puis renseigner LLM_API_KEY
 ```
 
-### Pipeline complet (ingestion → LLM → dbt)
+### Pipeline complet (ingestion → LLM → dbt → vectorisation)
 ```bash
 uv run python -m flows.pipeline              # une exécution
 uv run python -m flows.pipeline --limit 50   # enrichit au plus 50 nouveaux avis
@@ -191,7 +234,16 @@ uv run python -m enrichment.run
 cd transform && uv run dbt deps && uv run dbt build --profiles-dir .
 uv run dbt source freshness --profiles-dir .
 uv run dbt docs generate --profiles-dir . && uv run dbt docs serve --profiles-dir .
+cd ..
+uv run python -m rag.run                     # vectorise les avis (mistral-embed)
 ```
+
+### RAG et application
+```bash
+uv run python -m rag.engine "Que disent les clients des conseillers ?" --operateur sfr
+uv run streamlit run app.py                  # http://localhost:8501
+```
+Le modèle de churn utilisé par l'app est sauvegardé par `notebooks/02_modele_churn.ipynb` (`data/modele_churn.joblib`).
 
 ### Avec Docker
 ```bash
@@ -217,6 +269,8 @@ enrichment/    enrichissement LLM (motif, sentiment)
 transform/     projet dbt : staging → intermediate → marts, tests, sources
 flows/         orchestration Prefect + suivi des runs (pipeline_runs)
 modeling/      modèle de churn (logistique vs XGBoost, SHAP)
+rag/           vectorisation des avis + MoteurRAG (réponses sourcées)
+app.py         application Streamlit
 notebooks/     EDA churn, modèle de churn
 scripts/       base fictive pour la CI
 tests/         tests pytest (sans réseau)
@@ -236,6 +290,8 @@ docs/          énoncé du projet, figures
 - **Classification LLM** par un petit modèle gratuit : quelques erreurs sur les avis ambigus ou ironiques.
 - **Pas de jointure client** entre avis et dataset Kaggle (clients américains, anonymes) : le lien se fait
   par **motif**, au niveau des tendances.
+- **RAG** : la recherche est purement sémantique (pas de mots-clés) et les scores `mistral-embed` sont peu
+  discriminants ; une recherche hybride (BM25 + vecteurs) ou un reranker améliorerait la précision.
 - **DuckDB** = un seul processus écrivain à la fois : adapté à ce volume, à remplacer par un entrepôt
   (ex. Azure, BigQuery) pour un usage multi-utilisateurs.
 
@@ -244,8 +300,8 @@ docs/          énoncé du projet, figures
 ## Suite du projet
 
 - [x] Modèle de churn : baseline régression logistique vs **XGBoost**, explicabilité **SHAP**
-- [ ] **RAG** sur les avis : questions en langage naturel, réponses sourcées
-- [ ] Application **Streamlit**
+- [x] **RAG** sur les avis : questions en langage naturel, réponses sourcées
+- [x] Application **Streamlit**
 - [ ] Déploiement **Azure** (stockage Blob pour la couche brute, job planifié)
 
 ---

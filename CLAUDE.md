@@ -4,7 +4,7 @@ Projet portfolio, orienté **data engineer** (couvre aussi DS / ML / AI eng). Sp
 Communication : français, concis, informel. Modifs minimales, code simple et lisible. POO là où ça sert, fonctions ailleurs.
 
 ## Concept
-- Couche avis (réelle) : avis clients Orange / SFR / Bouygues → enrichissement LLM (motif, sentiment) → analyses dbt → (plus tard) RAG.
+- Couche avis (réelle) : avis clients Orange / SFR / Bouygues → enrichissement LLM (motif, sentiment) → analyses dbt → RAG.
 - Couche churn : dataset Kaggle Telco Customer Churn → logistique vs XGBoost + SHAP.
 - Pont = 4 motifs : réseau, facturation, résiliation, service client. Avis et clients Kaggle ne sont PAS joignables (limite assumée).
 
@@ -16,6 +16,7 @@ Communication : français, concis, informel. Modifs minimales, code simple et li
 
 ## Commandes
 - Ingestion : `uv run python -m ingestion.run`
+- Vectorisation : `uv run python -m rag.run` · RAG : `uv run python -m rag.engine "question" [--operateur sfr] [--motif reseau]` · App : `uv run streamlit run app.py`
 - Enrichissement : `uv run python -m enrichment.run [--limit N]`
 - dbt : `cd transform && uv run dbt build --profiles-dir .`
 - Tests : `uv run pytest -q` · Lint : `uv run ruff check .` · Format : `uv run ruff format .`
@@ -34,7 +35,10 @@ Communication : français, concis, informel. Modifs minimales, code simple et li
 - Docker : `Dockerfile` (python 3.13-slim + uv, deps de uv.lock sans dev, dbt deps), `.dockerignore` (pas de .env ni data), `docker-compose.yml` (data/ monté, .env au lancement).
 - CI GitHub Actions : job qualite-et-tests (uv sync --locked → ruff → pytest → base fictive → dbt deps/build → freshness) + job docker (build de l'image).
 - `modeling/churn_model.py` : `ModeleChurn` (logistique | xgboost, déséquilibre compensé, SHAP par client, save/load joblib), `importance_par_motif`. Notebook `02_modele_churn` : ROC-AUC test 0,838 (logit) / 0,839 (XGB), rappel ≈ 0,77. Pont SHAP vs plaintes : résiliation 40,9 / 4,3 ; facturation 33,9 / 26,1 ; réseau 20,3 / 40,2 ; service client 4,9 / 29,5.
-- 24 tests pytest. README complet (architecture Mermaid, résultats avis + churn + pont, lancement, limites).
+- `rag/` : `Vectoriseur` (mistral-embed, client openai, `encoding_format="float"`) + `run.py` → table `avis_embeddings` (FLOAT[], incrémental, lots de 32, arrêt sur 429), 3 040 avis. `MoteurRAG` (`engine.py`) : cosinus SQL (`list_cosine_similarity`) + filtres opérateur/motif sur `int_avis_enrichis`, k=8, seuil 0,75, garde-fous (je ne sais pas sans LLM, prompt anti-invention, seules les sources citées). Scores mistral-embed tassés (pertinent ≈ 0,80-0,83, hors sujet ≈ 0,77-0,79).
+- Flow Prefect : ingestion → enrichissement → dbt → vectorisation.
+- `app.py` (racine) : Streamlit, 3 onglets (RAG, motifs, churn). `uv run streamlit run app.py`. Lit DuckDB en lecture seule + `data/modele_churn.joblib` (XGBoost, sauvé par le notebook 02).
+- 35 tests pytest. README complet (architecture Mermaid, résultats avis + churn + pont, lancement, limites).
 
 ## Décisions / limites connues
 - Reddit abandonné (création d'app bloquée, Responsible Builder Policy) → App Store à la place.
@@ -51,5 +55,6 @@ Communication : français, concis, informel. Modifs minimales, code simple et li
 - ✅ E. Docker (validé par la CI)
 - ✅ F. README
 - ✅ G. Modèle churn (logistique vs XGBoost, SHAP, pont motifs)
-- ⏭️ Ensuite : RAG (mistral-embed → table DuckDB `avis_embeddings`, cosinus en SQL, `MoteurRAG` dans `rag/`, réponses sourcées + « je ne sais pas »), puis app Streamlit ; bonus : déploiement Azure ; option : couche bronze Parquet.
+- ✅ H. RAG (vectorisation + MoteurRAG) et app Streamlit
+- ⏭️ Ensuite : captures de l'app dans le README ; bonus : déploiement Azure ; option : couche bronze Parquet.
 - À faire à la fin : guide HTML qui explique tout le projet simplement (préparation entretiens).
