@@ -23,6 +23,7 @@ COPY flows/ flows/
 COPY transform/ transform/
 COPY rag/ rag/
 COPY modeling/ modeling/
+COPY cloud/ cloud/
 COPY app.py ./
 
 # 3) Paquets dbt (dbt_utils) installés une fois pour toutes dans l'image

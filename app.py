@@ -2,12 +2,16 @@
 
 Lancement (depuis la racine du projet) : uv run streamlit run app.py
 Prérequis : pipeline lancé (avis enrichis, dbt build, rag.run) et modèle sauvegardé par le notebook 02.
+Dans Azure, la base et le modèle sont téléchargés depuis Blob Storage au démarrage (voir cloud/blob.py).
 """
+
+import os
 
 import duckdb
 import pandas as pd
 import streamlit as st
 
+from cloud import blob
 from ingestion.run import DB_PATH
 from modeling.churn_model import ModeleChurn, motif_de, preparer_X_y
 from rag.engine import MoteurRAG
@@ -15,12 +19,22 @@ from rag.engine import MoteurRAG
 MODELE_PATH = "data/modele_churn.joblib"
 OPERATEURS = ["orange", "sfr", "bouygues"]
 MOTIFS = ["reseau", "facturation", "resiliation", "service_client", "autre"]
+# App publique : chaque question coûte un appel au LLM, on limite le nombre de questions par visiteur
+MAX_QUESTIONS = int(os.getenv("MAX_QUESTIONS_PAR_SESSION", "10"))
+RAFRAICHIR = 6 * 3600  # en secondes : on recharge la base (mise à jour chaque matin par le pipeline)
 
 st.set_page_config(page_title="Telco 360", page_icon="📡", layout="wide")
 
 
 # --- Chargements mis en cache : faits une seule fois, pas à chaque clic -------------------------------
+@st.cache_resource(ttl=RAFRAICHIR)
+def donnees() -> list[str]:
+    """Dans Azure : télécharge la base et le modèle depuis Blob (en local : ne fait rien)."""
+    return blob.telecharger([blob.BASE, blob.MODELE])
+
+
 def lire(sql: str) -> pd.DataFrame:
+    donnees()
     with duckdb.connect(str(DB_PATH), read_only=True) as con:  # lecture seule : ne bloque pas le pipeline
         return con.sql(sql).df()
 
@@ -30,17 +44,18 @@ def moteur_rag() -> MoteurRAG:
     return MoteurRAG.depuis_env()
 
 
-@st.cache_data
+@st.cache_data(ttl=RAFRAICHIR)
 def motifs_operateur() -> pd.DataFrame:
     return lire("SELECT * FROM mart_motifs_operateur")
 
 
-@st.cache_resource
+@st.cache_resource(ttl=RAFRAICHIR)
 def modele_churn() -> ModeleChurn:
+    donnees()
     return ModeleChurn.load(MODELE_PATH)
 
 
-@st.cache_data
+@st.cache_data(ttl=RAFRAICHIR)
 def clients_scores() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Clients Kaggle + probabilité de churn prédite (X sert ensuite à expliquer un client)."""
     clients = lire("SELECT * FROM stg_churn")
@@ -66,7 +81,10 @@ with onglet_rag:
     operateur = col1.selectbox("Opérateur", [None, *OPERATEURS], format_func=lambda v: v or "tous")
     motif = col2.selectbox("Motif", [None, *MOTIFS], format_func=lambda v: v or "tous")
 
-    if st.button("Répondre", type="primary", disabled=not question):
+    posees = st.session_state.setdefault("questions_posees", 0)
+    epuise = posees >= MAX_QUESTIONS
+    if st.button("Répondre", type="primary", disabled=not question or epuise):
+        st.session_state["questions_posees"] = posees = posees + 1
         with st.spinner("Recherche des avis et rédaction de la réponse…"):
             res = moteur_rag().repondre(question, operateur, motif)
         st.markdown(res["reponse"])
@@ -76,6 +94,9 @@ with onglet_rag:
             with st.expander(f"[{s['numero']}] {s['operateur']} · {s['motif']} · {s['note']}/5"):
                 st.write(s["texte"])
                 st.caption(f"{s['source']} · similarité {s['similarite']:.2f}")
+    st.caption(
+        f"{MAX_QUESTIONS - posees} question(s) restante(s) pour cette session (démo publique, quota LLM limité)."
+    )
 
 with onglet_motifs:
     df = motifs_operateur()

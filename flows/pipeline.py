@@ -12,10 +12,23 @@ from pathlib import Path
 
 from prefect import flow, get_run_logger, task
 
+from cloud import blob
 from enrichment.run import run as enrichir_avis
 from flows.suivi import nouveau_run_id, suivre
 from ingestion.run import run as ingerer_avis
 from rag.run import run as vectoriser_avis
+
+
+@task(retries=2, retry_delay_seconds=30)
+def recuperer_donnees() -> list[str]:
+    """Dans Azure : base DuckDB + CSV Kaggle depuis Blob Storage (en local : ne fait rien)."""
+    return blob.telecharger([blob.BASE, blob.CSV])
+
+
+@task(retries=2, retry_delay_seconds=30)
+def sauvegarder_donnees() -> list[str]:
+    """Dans Azure : renvoie la base mise à jour vers Blob Storage (en local : ne fait rien)."""
+    return blob.envoyer([blob.BASE])
 
 
 @task(retries=2, retry_delay_seconds=60)  # Google Play / Apple peuvent échouer ponctuellement
@@ -55,10 +68,12 @@ def pipeline(limit: int | None = None) -> None:
     run_id = nouveau_run_id()
     logger.info("Run %s", run_id)
 
+    recuperer_donnees()
     nouveaux = ingestion(run_id)
     enrichis = enrichissement(run_id, limit)
     dbt_build(run_id)
     vectorises = vectorisation(run_id)
+    sauvegarder_donnees()  # seulement si tout a réussi : une étape en échec arrête le flow avant
 
     logger.info(
         "Run %s terminé : %s nouveaux avis, %s enrichis, %s vectorisés",
